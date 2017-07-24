@@ -36,18 +36,65 @@ def prep(filename, exp_id, store, ln):
 					row[i] = "\N"
 			outdata.writerow(row)
 
+def singConv(infile, outfile, exp_id, error):
+	if (infile == "" or outfile == ""):
+		return
+	else:
+		with open(infile, 'rb') as indata, open(outfile, 'wb') as outdata:
+			indata = csv.reader(indata, delimiter = "\t")
+			outdata = csv.writer(outdata, delimiter = "\t")
+			attributes = ["ts", "event_type", "session", "game_number", "episode_number", "level", "score", "lines_cleared", "completed", "zoid_sequence", "evt_id", "evt_data1", "evt_data2", "curr_zoid", "next_zoid", "danger_mode","delaying", "dropping", "zoid_rot", "zoid_col", "zoid_row", "board_rep", "zoid_rep", "smi_ts", "smi_eyes", "smi_samp_x_l", "smi_samp_x_r", "smi_samp_y_l", "smi_samp_y_r", "smi_diam_x_l", "smi_diam_x_r", "smi_diam_y_l", "smi_diam_y_r", "smi_eye_x_l", "smi_eye_x_r", "smi_eye_y_l", "smi_eye_y_r", "smi_eye_z_l", "smi_eye_z_r", "fix_x", "fix_y","pits", "tetris_progress", 'game_seed', 'height', 'avgheight', 'roughness', 'ridge_len', 'ridge_len_sqr', 'tetris_available', 'filled_rows_covered', 'tetrises_covered', 'good_pos_curr', 'good_pos_next', 'good_pos_any',"exp_id"]
+			# if the unknown column is evt column
+			evt = 0
+			outdata.writerow(attributes)
+			for row in indata:
+				err = 0
+				wrow = ["\N"]*len(attributes)
+				for i, value in enumerate(row):
+					index = -1
+					if (value != ""):
+						if (value[0] == ':'):
+							if (value[1:] in attributes):
+								index = attributes.index(value[1:])
+								wrow[index] = row[i+1]
+							else:
+								if (evt == 0):
+									# then the unknown : is belong evt_id
+									wrow[attributes.index("evt_id")] = value[1:]
+									wrow[attributes.index("evt_data1")] = row[i+1]
+									wrow[attributes.index("evt_data2")] = "setup"
+								else:
+									#write to error
+									error.write(str(row))
+									error.write('\n')
+									err = 1
+						else:
+							continue
+				wrow[-1] = exp_id
+				if (err == 0):
+					outdata.writerow(wrow)
+				if ("Start" in wrow):
+					evt = 1
 
-def itrDir(exp_folder, exp_id, storing_path, ln):
+
+def itrDir(exp_folder, exp_id, storing_path, ln, thir):
 	#temporarily put files in the folder on the desktop
 	for root, dirs, files in os.walk(exp_folder):
 		for name in files:
-			if "games" not in name and "eps" not in name and "incomplete" not in name and "episodes" not in name and ".tsv" in name and "complete_" in name and "2013" not in name and "lock" not in name:
-				outname = ''.join([storing_path, name])
-				inname = os.path.join(root,name)
-				prep(inname, exp_id, outname, ln)
-			else:
-				continue
-
+			if (thir == "1"):
+				if "games" not in name and "eps" not in name and "incomplete" not in name and "episodes" not in name and ".tsv" in name and "complete_" in name and "2013" not in name and "lock" not in name:
+					outname = ''.join([storing_path, name])
+					inname = os.path.join(root,name)
+					prep(inname, exp_id, outname, ln)
+				else:
+					continue
+			elif(thir == "2"):
+				if "games" not in name and "eps" not in name and "incomplete" not in name and "episodes" not in name and ".tsv" in name and ".incomplete" not in name and "2013" in name and "lock" not in name:
+					outname = ''.join([storing_path, name])
+					inname = os.path.join(root,name)
+					singConv(inname, outname,exp_id,ln)
+				else:
+					continue
 
 def loadFile(directory,tetrisDB,ef,imf):
 	for subdir, dirs, files in os.walk(directory):
@@ -89,7 +136,8 @@ if __name__ == "__main__":
 		ln = "wrongdata-"+str(exp_id)+"-"+str(part)+".txt"
 		lnfile = open(ln,"w")
 		#first convert all the data
-		itrDir(indir,exp_id,ot,lnfile)
+		thirt = raw_input("1.after 2013 2.2013")
+		itrDir(indir,exp_id,ot,lnfile,thirt)
 		lnfile.close()
 		#then using the loaddata function to input all the data into the database
 		#have a file to write errors
