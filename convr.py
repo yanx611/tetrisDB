@@ -4,7 +4,7 @@ import os
 def conv_source(filename, exp_id, outname):
 	with open(filename,'rb') as indata, open(outname, 'wb') as outdata:
 		indata = csv.reader(indata,delimiter='\t')
-		outdata = csv.writer(outdata,delimiter='\t')
+		outdata = csv.writer(outdata)
 		headerflag = 0
 		for row in indata:
 			if (headerflag == 0):
@@ -17,20 +17,20 @@ def conv_source(filename, exp_id, outname):
 
 def itr_dir(exp_folder, exp_id):
 	#temporarily put files in the folder on the desktop
-	storing_path = "/Users/Etsu/Desktop/temp/"
-	#count = 0
-	for root, dirs, files in os.walk(exp_folder):
-		for name in files:
-            #make sure the file is complete
-			if "complete_" in name and "incomplete" not in name:
-				outname = ''.join([storing_path, name])
-				inname = os.path.join(root,name)
-            	print ("converting", inname)
-            	# print ("store at", outname)
-            	# conv_source(inname, exp_id, outname)
+	storing_path = "/home/cogworks/Desktop/2016LongTerm/"
+	count = 0
+        for root, dirs, files in os.walk(exp_folder):
+                for name in files:
+                        #make sure the file is complete
+                        #if "complete_" in name and "incomplete" not in name:
+                        #       outname = ''.join([storing_path, name])
+			#	inname = os.path.join(root,name)
+			#	print ("converting", inname)
+			#	print ("store at", outname)
+			#	conv_source(inname, exp_id, outname)
 
-            #if "games" not in name and "eps" not in name and "incomplete" not in name and "episodes" not in name and ".tsv" in name:
-            #	outname = ''.join([storing_path, name])
+                        #if "games" not in name and "eps" not in name and "incomplete" not in name and "episodes" not in name and ".tsv" in name:
+                        #	outname = ''.join([storing_path, name])
 			#	if (os.path.exists(outname)):
 			#		continue
 			#	else:
@@ -38,7 +38,9 @@ def itr_dir(exp_folder, exp_id):
 			#		print ("converting", inname)
 			#		print ("store at", outname)
 			#		conv_source(inname, exp_id, outname)
-	#print (count)
+			if "games" not in name and "eps" not in name and ".incomplete" in name and "episodes" not in name and ".tsv" in name and "complete_" in name:
+				count += 1
+	print (count)
 			
 
 def main():
