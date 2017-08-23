@@ -6,15 +6,19 @@ import csv
 
 def prep(filename, exp_id, store, ln):
 	if (filename == ""):
+		#no filename is provided
 		return
 	print ("converting", filename)
 	with open(filename,'rb') as indata, open(store, 'wb') as outdata:
 		indata = csv.reader(indata,delimiter='\t')
 		outdata = csv.writer(outdata, delimiter = "\t")
+		#if it is a header line
 		headerflag = 0
+		#headercount check if this year has new field 
 		headercount = 0
 		for row in indata:
 			if (headerflag == 0):
+				#insert exp_id header 
 				headercount = len(row)
 				row.append('exp_id')
 				headerflag = 1
@@ -33,9 +37,11 @@ def prep(filename, exp_id, store, ln):
 				row.append(str(exp_id))
 			for i,value in enumerate(row):
 				if (value == "" or value == "None"):
+					#allow SQL recognize NULL
 					row[i] = "\N"
 			outdata.writerow(row)
 
+#used for convert 2013 data 
 def singConv(infile, outfile, exp_id, error):
 	if (infile == "" or outfile == ""):
 		return
@@ -103,7 +109,6 @@ def loadFile(directory,tetrisDB,ef,imf):
 				datadir = os.path.join(subdir, data)
 				datadir = os.path.abspath(datadir)
 				# load into database 
-				# try:
 				header = ""
 				print ("V loading, ", datadir)
 				with open(datadir,'rb') as indata:
@@ -113,7 +118,7 @@ def loadFile(directory,tetrisDB,ef,imf):
 						break
 				try:
 					cursor = tetrisDB.cursor()
-					query = """LOAD DATA LOCAL INFILE '{}' INTO TABLE complete FIELDS TERMINATED BY '\t' LINES TERMINATED BY '\n' IGNORE 1 LINES ({}); """
+					query = """LOAD DATA LOCAL INFILE '{}' INTO TABLE completeTbl FIELDS TERMINATED BY '\t' LINES TERMINATED BY '\n' IGNORE 1 LINES ({}); """	
 					cursor.execute(query.format(datadir, header))
 					tetrisDB.commit()
 					imf.write(data)
@@ -136,7 +141,7 @@ if __name__ == "__main__":
 		ln = "wrongdata-"+str(exp_id)+"-"+str(part)+".txt"
 		lnfile = open(ln,"w")
 		#first convert all the data
-		thirt = raw_input("1.after 2013 2.2013")
+		thirt = raw_input("1.after 2013 2.2013 -> ")
 		itrDir(indir,exp_id,ot,lnfile,thirt)
 		lnfile.close()
 		#then using the loaddata function to input all the data into the database
