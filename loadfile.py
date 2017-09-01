@@ -1,179 +1,163 @@
 import MySQLdb
 import os
 import csv
+from datetime import datetime
 
-# export DYLD_LIBRARY_PATH=/usr/local/mysql/lib/
+"""
+Error :
+Traceback (most recent call last):
+  File "loadfile.py", line 1, in <module>
+    import MySQLdb
+  File "/usr/local/lib/python2.7/site-packages/MySQLdb/__init__.py", line 19, in <module>
+    import _mysql
+ImportError: dlopen(/usr/local/lib/python2.7/site-packages/_mysql.so, 2): Library not loaded: libmysqlclient.18.dylib
+  Referenced from: /usr/local/lib/python2.7/site-packages/_mysql.so
+  Reason: image not found
 
-def prep(filename, exp_id, store, ln):
-	if (filename == ""):
-		#no filename is provided
-		return
-	print ("converting", filename)
-	with open(filename,'rb') as indata, open(store, 'wb') as outdata:
-		indata = csv.reader(indata,delimiter='\t')
-		outdata = csv.writer(outdata, delimiter = "\t")
-		#if it is a header line
-		headerflag = 0
-		#headercount check if this year has new field 
-		headercount = 0
-		for row in indata:
-			if (headerflag == 0):
-				#insert exp_id header 
-				headercount = len(row)
-				row.append('exp_id')
-				headerflag = 1
-			else:
-				if (len(row) != headercount):
-					num = headercount - len(row)
-					for i in range(num):
-						row.append("\N")
-				elif (len(row) > headercount):
-					#record the data and skip
-					ln.write(filename)
-					ln.write("\n ... \n")
-					ln.write(row)
-					ln.write("\n")		
-					continue
-				row.append(str(exp_id))
-			for i,value in enumerate(row):
-				if (value == "" or value == "None"):
-					#allow SQL recognize NULL
-					row[i] = "\N"
-			outdata.writerow(row)
-
-#used for convert 2013 data 
-def singConv(infile, outfile, exp_id, error):
-	if (infile == "" or outfile == ""):
-		return
-	else:
-		with open(infile, 'rb') as indata, open(outfile, 'wb') as outdata:
-			indata = csv.reader(indata, delimiter = "\t")
-			outdata = csv.writer(outdata, delimiter = "\t")
-			attributes = ["ts", "event_type", "session", "game_number", "episode_number", "level", "score", "lines_cleared", "completed", "zoid_sequence", "evt_id", "evt_data1", "evt_data2", "curr_zoid", "next_zoid", "danger_mode","delaying", "dropping", "zoid_rot", "zoid_col", "zoid_row", "board_rep", "zoid_rep", "smi_ts", "smi_eyes", "smi_samp_x_l", "smi_samp_x_r", "smi_samp_y_l", "smi_samp_y_r", "smi_diam_x_l", "smi_diam_x_r", "smi_diam_y_l", "smi_diam_y_r", "smi_eye_x_l", "smi_eye_x_r", "smi_eye_y_l", "smi_eye_y_r", "smi_eye_z_l", "smi_eye_z_r", "fix_x", "fix_y","pits", "tetris_progress", 'game_seed', 'height', 'avgheight', 'roughness', 'ridge_len', 'ridge_len_sqr', 'tetris_available', 'filled_rows_covered', 'tetrises_covered', 'good_pos_curr', 'good_pos_next', 'good_pos_any',"exp_id"]
-			# if the unknown column is evt column
-			evt = 0
-			outdata.writerow(attributes)
-			for row in indata:
-				err = 0
-				wrow = ["\N"]*len(attributes)
-				for i, value in enumerate(row):
-					index = -1
-					if (value != ""):
-						if (value[0] == ':'):
-							if (value[1:] in attributes):
-								index = attributes.index(value[1:])
-								wrow[index] = row[i+1]
-							else:
-								if (evt == 0):
-									# then the unknown : is belong evt_id
-									wrow[attributes.index("evt_id")] = value[1:]
-									wrow[attributes.index("evt_data1")] = row[i+1]
-									wrow[attributes.index("evt_data2")] = "setup"
-								else:
-									#write to error
-									error.write(str(row))
-									error.write('\n')
-									err = 1
-						else:
-							continue
-				wrow[-1] = exp_id
-				if (err == 0):
-					outdata.writerow(wrow)
-				if ("Start" in wrow):
-					evt = 1
+Use the following command in terminal will solve the problem
+export DYLD_LIBRARY_PATH=/usr/local/mysql/lib/
+"""
 
 
-def itrDir(exp_folder, exp_id, storing_path, ln, thir):
-	#temporarily put files in the folder on the desktop
-	for root, dirs, files in os.walk(exp_folder):
-		for name in files:
-			if (thir == "1"):
-				if "games" not in name and "eps" not in name and "incomplete" not in name and "episodes" not in name and ".tsv" in name and "complete_" in name and "2013" not in name and "lock" not in name:
-					outname = ''.join([storing_path, name])
-					inname = os.path.join(root,name)
-					prep(inname, exp_id, outname, ln)
-				else:
-					continue
-			elif(thir == "2"):
-				if "games" not in name and "eps" not in name and "incomplete" not in name and "episodes" not in name and ".tsv" in name and ".incomplete" not in name and "2013" in name and "lock" not in name:
-					outname = ''.join([storing_path, name])
-					inname = os.path.join(root,name)
-					singConv(inname, outname,exp_id,ln)
-				else:
-					continue
+def prep(inFileName, exp_id, outFileName, crpFile): # used for converting data collected after 2013
+    if inFileName == "" and outFileName == "": # no fileName is provided
+        return
+    with open(inFileName,'rb') as inData, open(outFileName, 'wb') as outData:
+        inData = csv.reader(inData,delimiter='\t')
+        outData = csv.writer(outData, delimiter = "\t")
+        hdFlag = 0 # if it is a header line
+        hdCount = 0 # new field, such as 'agree' appeared at some time in previous file
+        for row in inData:
+            if hdFlag == 0 and 'exp_id' not in row:#insert exp_id header
+                hdCount = len(row)
+                row.append('exp_id')
+                hdFlag = 1
+            else:
+                if len(row) < hdCount:
+                    num = hdCount - len(row)
+                    for i in range(num):
+                        row.append("\N")
+                elif len(row) > hdCount:
+                    crpFile.write(inFileName+"\n ... \n"+row+"\n")
+                    continue
+                row.append(str(exp_id))
+            for i,value in enumerate(row): # clean up all the empty '' to '\N' for easier inserting
+                if value == "" or value == "None": # allow SQL recognize NULL
+                    row[i] = "\N"
+            outData.writerow(row) # record which data has been inserted
+
+
+def prep13(inFileName, outFileName, exp_id, crpFile): #used for convert 2013 data
+    if inFileName == "" or outFileName == "":
+        return
+    else:
+        with open(inFileName, 'rb') as inData, open(outFileName, 'wb') as outData:
+            inData = csv.reader(inData, delimiter = "\t")
+            outData = csv.writer(outData, delimiter = "\t")
+            '''the order of the inserting format for 2013 output data'''
+            attributes = ["ts", "event_type", "session", "game_number", "episode_number", "level", "score", "lines_cleared", "completed", "zoid_sequence", "evt_id", "evt_data1", "evt_data2", "curr_zoid", "next_zoid", "danger_mode","delaying", "dropping", "zoid_rot", "zoid_col", "zoid_row", "board_rep", "zoid_rep", "smi_ts", "smi_eyes", "smi_samp_x_l", "smi_samp_x_r", "smi_samp_y_l", "smi_samp_y_r", "smi_diam_x_l", "smi_diam_x_r", "smi_diam_y_l", "smi_diam_y_r", "smi_eye_x_l", "smi_eye_x_r", "smi_eye_y_l", "smi_eye_y_r", "smi_eye_z_l", "smi_eye_z_r", "fix_x", "fix_y","pits", "tetris_progress", 'game_seed', 'height', 'avgheight', 'roughness', 'ridge_len', 'ridge_len_sqr', 'tetris_available', 'filled_rows_covered', 'tetrises_covered', 'good_pos_curr', 'good_pos_next', 'good_pos_any',"exp_id"]
+            evt = 0 #the unknown column is evt data column or not
+            outData.writerow(attributes)
+            for row in inData:
+                err = 0
+                wrow = ["\N"]*len(attributes)
+                for i, value in enumerate(row):
+                    index = -1
+                    if value != "":
+                        if value[0] == ':':
+                            if value[1:] in attributes:
+                                index = attributes.index(value[1:])
+                                wrow[index] = row[i+1]
+                            else:
+                                if evt == 0: #the unknown : is belong evt_id
+                                    wrow[attributes.index("evt_id")] = value[1:]
+                                    wrow[attributes.index("evt_data1")] = row[i+1]
+                                    wrow[attributes.index("evt_data2")] = "setup"
+                                else: #write to crpFile
+                                    crpFile.write(str(row)+"\n")
+                                    err = 1
+                        else:
+                            continue
+                wrow[-1] = exp_id #write exp_id to each line of output data
+                if err == 0:
+                    outData.writerow(wrow)
+                if "Start" in wrow:
+                    evt = 1
+
+
+def itrDir(inDir, exp_id, outDir, crpFile, thir): #temporarily put files in the folder on the desktop
+    for root, dirs, files in os.walk(inDir):
+        for name in files:
+            if thir == "1":
+                if "games" not in name and "eps" not in name and "incomplete" not in name and "episodes" not in name and ".tsv" in name and "complete_" in name and "2013" not in name and "lock" not in name:
+                    outFileName = ''.join([outDir, name])
+                    inFileName = os.path.join(root,name)
+                    prep(inFileName, exp_id, outFileName, crpFile)
+                else:
+                    continue
+            elif thir == "2":
+                if "games" not in name and "eps" not in name and "incomplete" not in name and "episodes" not in name and ".tsv" in name and ".incomplete" not in name and "2013" in name and "lock" not in name:
+                    outFileName = ''.join([outDir, name])
+                    inFileName = os.path.join(root,name)
+                    prep13(inFileName, outFileName,exp_id,crpFile)
+                else:
+                    continue
 
 def loadFile(directory,tetrisDB,ef,imf):
-	for subdir, dirs, files in os.walk(directory):
-		for data in files:
-			if "games" not in data and "eps" not in data and "incomplete" not in data and "episodes" not in data and ".tsv" in data:
-				datadir = os.path.join(subdir, data)
-				datadir = os.path.abspath(datadir)
-				# load into database 
-				header = ""
-				print ("V loading, ", datadir)
-				with open(datadir,'rb') as indata:
-					indata = csv.reader(indata,delimiter='\t')
-					for row in indata:
-						header = ','.join(row)
-						break
-				try:
-					cursor = tetrisDB.cursor()
-					query = """LOAD DATA LOCAL INFILE '{}' INTO TABLE completeTbl FIELDS TERMINATED BY '\t' LINES TERMINATED BY '\n' IGNORE 1 LINES ({}); """	
-					cursor.execute(query.format(datadir, header))
-					tetrisDB.commit()
-					imf.write(data)
-					imf.write("\n")
-				except:
-					ef.write("Exception: ")
-					ef.write(data)
-					ef.write("\n")
-					tetrisDB.rollback()
+    for subdir, dirs, files in os.walk(directory):
+        for data in files:
+            if "games" not in data and "eps" not in data and "incomplete" not in data and "episodes" not in data and ".tsv" in data:
+                dataDir = os.path.join(subdir, data)
+                dataDir = os.path.abspath(dataDir)
+                header = ""
+                #print ("V loading, ", dataDir)
+                with open(dataDir,'rb') as inData:
+                    inData = csv.reader(inData,delimiter='\t')
+                    for row in inData:
+                        header = ','.join(row)
+                        break
+                try: # load into database
+                    cursor = tetrisDB.cursor()
+                    query = """LOAD DATA LOCAL INFILE '{}' INTO TABLE completeTbl FIELDS TERMINATED BY '\t' LINES TERMINATED BY '\n' IGNORE 1 LINES ({}); """
+                    cursor.execute(query.format(dataDir, header))
+                    tetrisDB.commit()
+                    imf.write(dataDir+" \n")
+                except: # fail then rollback
+                    ef.write("Exception: "+dataDir+" \n")
+                    tetrisDB.rollback()
 
 
 if __name__ == "__main__":
-	convim = raw_input("1. convert+import 2.import -> ")
-	if (convim == "1"):
-		indir = raw_input("give the experiment folder name: ")
-		#enter with the / in the path
-		ot = raw_input("give the output folder name: ")
-		exp_id = raw_input("assign the experiment id: ")
-		part = raw_input("assign the part id: ")
-		ln = "wrongdata-"+str(exp_id)+"-"+str(part)+".txt"
-		lnfile = open(ln,"w")
-		#first convert all the data
-		thirt = raw_input("1.after 2013 2.2013 -> ")
-		itrDir(indir,exp_id,ot,lnfile,thirt)
-		lnfile.close()
-		#then using the loaddata function to input all the data into the database
-		#have a file to write errors
-		conv = raw_input("Import or not?")
-		if (conv == "Yes"):
-			tetrisDB = MySQLdb.connect(host = "localhost", user = "root", passwd = "password123", db = "TetrisDB", local_infile = 1)
-			efn = "errors-"+str(exp_id)+"-"+str(part)+".txt"
-			ifn = "imported"+str(exp_id)+"-"+str(part)+".txt"
-			errorfile = open(efn, "w")
-			importfile = open(ifn,"w")
-			loadFile(ot,tetrisDB, errorfile, importfile)
-			errorfile.close()
-			importfile.close()
-			tetrisDB.close()
-	elif (convim == "2"):
-		ot = raw_input("give the output folder name: ")	
-		exp_id = raw_input("assign the experiment id: ")
-		part = raw_input("assign the part id: ")
-		tetrisDB = MySQLdb.connect(host = "localhost", user = "root", passwd = "password123", db = "TetrisDB", local_infile = 1)
-		efn = "errors-"+str(exp_id)+"-"+str(part)+".txt"
-		ifn = "imported-"+str(exp_id)+"-"+str(part)+".txt"
-		errorfile = open(efn, "w")
-		importfile = open(ifn,"w")
-		loadFile(ot,tetrisDB, errorfile, importfile)
-		errorfile.close()
-		importfile.close()
-		tetrisDB.close()
-
-				
-	
-	
-
-
-
+    convIm = raw_input("1. convert 2.import -> ")
+    if convIm == "1":
+        inDir = raw_input("give the experiment folder name -> ") #enter with '/' in the path
+        outDir = raw_input("give the output folder name -> ")
+        exp_id = raw_input("assign the experiment id -> ")
+        data13 = raw_input("1.after 2013 2.2013 -> ")
+        crpFileName = "corrupted-"+str(datetime.now())+".txt"
+        crpFile = open(crpFileName,"w")
+        itrDir(inDir,exp_id,outDir,crpFile,data13)
+        crpFile.close()
+        conv = raw_input("1. Import 2. Do not import -> ")
+        if conv == "1":
+            tetrisDB = MySQLdb.connect(host = "localhost", user = "root", passwd = "password123", db = "TetrisDB", local_infile = 1)
+            errFileName = "err-"+str(datetime.now())+".txt"
+            impFileName = "ipt-"+str(datetime.now())+".txt"
+            errFile = open(errFileName, "w")
+            impFile = open(impFileName,"w")
+            loadFile(outDir,tetrisDB, errFile, impFile)
+            errFile.close()
+            impFile.close()
+            tetrisDB.close()
+    elif convIm == "2":
+        outDir = raw_input("give the output folder name -> ")
+        exp_id = raw_input("confirm the experiment id -> ")
+        tetrisDB = MySQLdb.connect(host = "localhost", user = "root", passwd = "password123", db = "TetrisDB", local_infile = 1)
+        errFileName = "err-"+str(datetime.now())+".txt"
+        impFileName = "ipt-"+str(datetime.now())+".txt"
+        errFile = open(errFileName, "w")
+        impFile = open(impFileName,"w")
+        loadFile(outDir,tetrisDB, errFile, impFile)
+        errFile.close()
+        impFile.close()
+        tetrisDB.close()
